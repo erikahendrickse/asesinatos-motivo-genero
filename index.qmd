@@ -1,0 +1,373 @@
+---
+title: "Asesinatos por cuestión de género"
+subtitle: "Ensañamiento y distribución por provincia"
+author: "Erika Hendrickse"
+date: "10/15/2025"
+format:
+  html: 
+    toc: true
+    toc-location: left
+    number-sections: true
+    code-fold: true
+    embed-resources: true
+    theme: simplex
+    warnings: false
+    message: false
+    errors: false
+    self-contained: true
+---
+
+## Introducción y objetivos
+
+El dataset seleccionado para trabajar brinda datos sobre asesinatos por motivo de género, tanto femicidios como homicidios y trans/travesticidios, entre los años 2012 y 2019 en Argentina. A partir de esta información se construyeron tres preguntas:
+
+-   a\) ¿Qué genero registra mayor cantidad de asesinatos por motivo de genero?
+
+-   b) ¿Que genero registra mayor ensañamiento según modalidad de asesinato?
+
+-   c\) ¿En qué provincias de Argentina hay más femicidios?
+
+## Pasos a seguir
+
+1.  Carga y exploración del dataset
+
+2.  Limpieza y preparación
+
+3.  Construcción de obetos visuales
+
+## Carga y exploración del dataset
+
+3.1. Cargo el dataset
+
+```{r}
+url_1 <- "https://datos.jus.gob.ar/dataset/27bb9b2c-521b-406c-bdf9-98110ef73f34/resource/583cec9a-3022-4234-8b32-17692a267aac/download/registro-de-femicidios-20200109.csv"
+df_1 <- read.csv(url_1)
+
+```
+
+3.1. Cargo librerías
+
+```{r, indclude = FALSE}
+library(tidyverse)
+library(dplyr)
+library(purrr)
+```
+
+3.3. Exploro la estructura del dataset
+
+```{r, indclude = FALSE}
+glimpse(df_1)
+
+```
+
+## Limpieza y preparación
+
+4.1. Defino las variables cualitativas sobre las que voy a trabajar
+
+```{r}
+variables_cuali <- c("victima_identidad_genero", "victima_tipo", "hecho_provincia",
+                     "hecho_modalidad_comisiva", "fuente_tipo")
+
+```
+
+4.2. Elimino las filas cuyo género adquiere el valor " " o "null" dado que no puedo saber el genero con certeza. Y elimino a menores de edad para tener la poblacion adulta. Al valor " " de modalidad de asesinato lo reemplazo por "otro"
+
+```{r}
+library(dplyr)
+df_1_limpio <- df_1 %>%
+  filter(!victima_identidad_genero %in% c("", "null")) %>%
+  filter(victima_edad >= 18)
+
+#
+
+df_1$hecho_modalidad_comisiva[df_1$hecho_modalidad_comisiva == " "] <- "Otro"
+```
+
+4.3. Creo 3 dataframes diferentes, uno por cada categoría de genero para trabajar posteriormente. Observo que valores unicos adquieren mis otras variables cuali.
+
+**#1°Creo el df femicidios**
+
+```{r, indclude = FALSE}
+
+#acá creo el df por genero mujer
+df_femicidios <- df_1_limpio %>% 
+  filter(victima_identidad_genero %in% "MUJER")
+
+
+```
+
+**#2° Creo el df trans/travesticidios y observo que valores adquieren las variables cuali**
+
+```{r, indclude = FALSE}
+
+df_trans <- df_1_limpio%>% 
+  filter(victima_identidad_genero %in% "TRANSGENERO")
+
+```
+
+**#3° Creo el df homicidios por cuestión de género y observo qué valores adquieren las variables cuali**
+
+```{r, indclude = FALSE}
+
+df_homicidios <- df_1_limpio %>% 
+  filter(victima_identidad_genero %in% "HOMBRE")
+
+
+```
+
+**#4° Obtengo la cantidad de veces que se repite cada valor unico de cada variable cualitativa en cada dataframe**
+
+```{r}
+#Para eso decidí hacer group by para cada uno. No sabia como usar map para distintos df a la vez asi que lo hice por separado
+
+femicidios_modalidad <- df_femicidios %>% group_by(hecho_modalidad_comisiva) %>%
+  summarise(n())
+
+trans_modalidad <- df_trans %>% group_by(hecho_modalidad_comisiva) %>%
+  summarise(n())
+
+homicidios_modalidad <- df_homicidios %>% group_by(hecho_modalidad_comisiva) %>%
+  summarise(n())
+```
+
+## Visualizaciones (1): gráficos de barras
+
+**a) ¿Qué genero registra mayor cantidad de asesinatos por motivo de genero?**
+
+```{r}
+#Grafico de barras agrupadas donde se observa la cantidad de femicidios, homicidios y trans/travesticidios por genero
+
+grafico_total <- df_1_limpio %>%
+  select(hecho_modalidad_comisiva, victima_identidad_genero) %>% 
+  group_by(hecho_modalidad_comisiva, victima_identidad_genero) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = victima_identidad_genero, y = count, fill = victima_identidad_genero)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Asesinatos por genero, años 2012 - 2019",
+    subtitle = "Barras apiladas",
+    x = "Genero",
+    y = "Cantidad de asesinatos",
+    fill = "Género"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(grafico_total)
+```
+
+Se observa que **los femicidios representan la mayor proporción de asesinatos por cuestión de género** registrados entre los años 2012 y 2019 en Argentina. La cantidad de casos en los que las víctimas son mujeres supera ampliamente a los homicidios de varones y a los trans/travesticidios, evidenciando una marcada desigualdad en la distribución de la violencia letal por género.
+
+Sin embargo, en el caso de los **trans/travesticidios**, no resulta redundante señalar que la cantidad de casos debe analizarse en relación con la menor proporción de personas trans en la población total. Por lo tanto, si bien el número absoluto de hechos es menor, esto no implica necesariamente una menor incidencia de la violencia hacia este grupo, sino que debe considerarse su situación de mayor vulnerabilidad y **menor representación demográfica**.
+
+**b) ¿Qué genero registra mayor ensañamiento según modalidad de asesinato?**
+
+```{r}
+
+#primero filtre por fem
+
+df_1_limpio_filtrado_genero_fem <- df_1_limpio %>%
+  filter(!victima_identidad_genero %in% c("HOMBRE", "TRANSGENERO"))
+
+##grafiqué
+grafico_fem <- df_1_limpio_filtrado_genero_fem %>%
+  select(hecho_modalidad_comisiva, victima_identidad_genero) %>% 
+  unnest(hecho_modalidad_comisiva) %>% 
+  group_by(hecho_modalidad_comisiva, victima_identidad_genero) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = hecho_modalidad_comisiva, y = count, fill = victima_identidad_genero)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Femicidios por motivo de genero segun modalidad años 2012 - 2019",
+    subtitle = "Barras apiladas",
+    x = "Modalidad",
+    y = "Cantidad de femicidios",
+    fill = "Género"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(grafico_fem)
+
+
+#Despues por trans
+
+df_1_limpio_filtrado_genero_trans <- df_1_limpio %>%
+  filter(!victima_identidad_genero %in% c("HOMBRE", "MUJER"))
+
+##grafiqué
+grafico_trans <- df_1_limpio_filtrado_genero_trans %>%
+  select(hecho_modalidad_comisiva, victima_identidad_genero) %>% 
+  unnest(hecho_modalidad_comisiva) %>% 
+  group_by(hecho_modalidad_comisiva, victima_identidad_genero) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = hecho_modalidad_comisiva, y = count, fill = victima_identidad_genero)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Asesinatos a personas trans por motivo de genero segun modalidad, años 2012 - 2019",
+    subtitle = "Barras apiladas",
+    x = "Modalidad",
+    y = "Cantidad de asesinatos",
+    fill = "Género"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(grafico_trans)
+
+#y finalmente por hom
+
+df_1_limpio_filtrado_genero_hom <- df_1_limpio %>%
+  filter(!victima_identidad_genero %in% c("MUJER", "TRANSGENERO"))
+
+#"grafiqué
+grafico_hom <- df_1_limpio_filtrado_genero_hom %>%
+  select(hecho_modalidad_comisiva, victima_identidad_genero) %>% 
+  unnest(hecho_modalidad_comisiva) %>% 
+  group_by(hecho_modalidad_comisiva, victima_identidad_genero) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = hecho_modalidad_comisiva, y = count, fill = victima_identidad_genero)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Homicidios por motivo de genero segun modalidad, años 2012 - 2019",
+    subtitle = "Barras apiladas",
+    x = "Modalidad",
+    y = "Cantidad de homicidios",
+    fill = "Género"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(grafico_hom)
+
+
+```
+
+A partir de los gráficos se observa que mientras que en los asesinatos por motivos de genero entre hombres y mujeres prevalece la modalidad "Disparo de bala", entre las población travesti/trans prevalece en primer lugar "Acuchillamiento" y luego "Golpes".
+
+Concluímos que aquellos **asesinatos por motivo de genero con mayor saña son los trans/travesticidios**.
+
+Sin embargo no es menor señalar el hecho de que dada la amplia diversificación de modalidades de asesinato que hay entre los **femicidios** podemos intuir que entre los femicidios **prevalece también un alto nivel de saña**.
+
+## Visualizaciones (2): mapas
+
+**c) ¿En qué provincias de Argentina hay más femicidios?**
+
+Cargamos los datos geoespaciales
+
+```{r}
+
+# ---  Cargamos las librerías que vamos a usar
+library(tidyverse) 
+library(sf) # Para trabajar con datos geoespaciales
+library(geoAr)
+## Carga poligonos geográficos de provincias argentinas
+provincias_sf <- get_geo(geo = "ARGENTINA", level = "provincia")
+## Cargar los nombres de las provincias
+etiquetas_provincias <- show_arg_codes(nivel = "provincias") %>% 
+  select(codprov_censo , name_iso)
+## unir nombres a df de poligonos
+provincias_sf <- provincias_sf %>% 
+  left_join(etiquetas_provincias, by = "codprov_censo")
+
+# creamos la tabla
+femicidios_prov <- df_femicidios %>% 
+  group_by(hecho_provincia_id) %>% 
+  summarise(suma_femicidio_prov = n_distinct(caso_numero)) 
+
+```
+
+Mapa 1: Mapa de coropletas/de calor
+
+```{r}
+#grafiqué mapa de calor simple (coropletas)
+
+grafico_concentracion_femicidios_provincia <- provincias_sf %>% 
+  mutate(codprov_censo = as.integer(codprov_censo)) %>% 
+  left_join(femicidios_prov, by = c("codprov_censo" = "hecho_provincia_id")) %>% 
+  ggplot()+
+  # usamos el valor de resumen como relleno para cada geometria
+  geom_sf(aes(fill = suma_femicidio_prov ))+
+  #agrego colores hechos con gpt
+  scale_fill_gradient(
+    low = "lightpink",
+    high = "red4",
+    na.value = "gray90",
+    name = "Femicidios"
+  )+
+  labs(title = "Concentración de femicidios por provincia",
+       subtitle = "Años 2012-2019",
+       fill = "Cantidad de femicidios",
+       caption = "Fuente: datos.gob.ar") +
+  theme_minimal() +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank())
+print(grafico_concentracion_femicidios_provincia)
+
+```
+
+Mapa 2
+
+```{r, include=FALSE}
+
+
+library(leaflet)
+
+#a. Centrar en arg
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -64, lat = -34, zoom = 3) 
+
+
+```
+
+```{r, include=FALSE}
+#b. siguiente paso
+# Crear mapa leaflet
+leaflet(data = df_1_limpio_filtrado_genero_trans) %>%
+  addPolygons(data = provincias_sf) %>% # Añade un mapa base (OpenStreetMap por defecto)
+  # Opcional: Ajustar la vista inicial
+  setView(lng = -64, lat = -34, zoom = 4) # Centrar en Argentina
+```
+
+```{r}
+#c.
+# Unimos los datos de conteo de bibliotecas al objeto espacial de provincias para Leaflet
+# Replicamos la unión hecha previamente
+provincias_con_datos_leaflet <- provincias_sf %>%
+  # convierto el tipo de variable para unir
+  mutate(hecho_provincia_id = as.integer(codprov_censo)) %>%
+  # unimos la tabla de resumen a la geometrias de provincias
+  left_join(femicidios_prov, by = "hecho_provincia_id") %>%
+  # Rellenar con 0 la cantidad de bibliotecas en provincias donde no hay registros
+  mutate(suma_femicidio_prov = replace_na(suma_femicidio_prov, 0))
+
+
+# Creamos una paleta de colores para el mapa interactivo de coropletas
+pal_leaflet <- colorNumeric(
+  # Hay varias podes elegir otra paleta si prefieres, consulta ?colorNumeric
+  palette = "YlGnBu", # Por ejemplo, Yellow-Green-Blue
+  domain = provincias_con_datos_leaflet$suma_femicidio_prov # El rango de valores a colorear
+)
+
+# Crear mapa leaflet
+mapa_femicidios_leaflet <- leaflet(data = provincias_con_datos_leaflet) %>%
+  addPolygons( # Añade los polígonos de las provincias
+    fillColor = ~pal_leaflet(suma_femicidio_prov), # Rellena usando la paleta y la cantidad de bibliotecas
+    fillOpacity = 0.8, # Opacidad del relleno
+    color = "white", # Color del borde de los polígonos
+    weight = 1, # Grosor del borde
+    # Información al pasar el mouse (etiquetas)
+    label = ~paste0(name_iso, ": ", suma_femicidio_prov, " femicidios"),
+    # Opcional: Información al hacer clic (popup)
+    popup = ~paste("</b><br>Femicidios: ", suma_femicidio_prov)
+  ) %>%
+  # Añade la leyenda de color
+  addLegend(pal = pal_leaflet, values = ~suma_femicidio_prov, title = "Cant. Femicidios") %>%
+  # Opcional: Ajustar la vista inicial
+  setView(lng = -64, lat = -34, zoom = 4) # Centrar en Argentina
+
+mapa_femicidios_leaflet
+
+```
+
+A partir de los gráficos de mapas se observa, tal como se esperaba dados los datos de población total, que la **mayor cantidad de femicidios** se encuentra en la **Provincia de Buenos Aires**.
+
+Sin embargo resulta fundamental para próximos proyectos trabajar con cantidad de femicidios sobre 100 mil habitantes para obtener la media de femicidios por provincia y desarrollar resultados más complejos.
